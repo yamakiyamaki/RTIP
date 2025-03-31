@@ -53,6 +53,92 @@
   }
     </script>
 
+  <script id="fragShader_conv_gauss" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    float sigma = 0.8;
+    float kernel_size = 3.0;
+
+    float Gaussian(float x, float y, float sigma) {
+      return exp(-(x * x + y * y)/ (2.0 * sigma * sigma)) / (2.0 * 3.14159265 * sigma * sigma);
+    }
+
+    //TODO make several image processing materials
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float gaussValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2.);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      //Gaussian filter
+      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+          {
+            pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            gaussValue = Gaussian(float(i), float(j), sigma);
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*gaussValue;
+            } else {
+                num_texels -= 1.0;
+            }
+          }
+      //textureValue /= float ((sizeDiv2*2+1)*(sizeDiv2*2+1)); // sum / numbers = average
+      textureValue /= num_texels;
+
+      //out_FragColor = textureValue*4.0;
+      out_FragColor = textureValue;
+
+
+  }
+    </script>
+  
+  <script id="fragShader_conv_lapla" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    float sigma = 0.8;
+    float kernel_size = 3.0;
+
+    float Laplacian(int x, int y) {
+      mat3 kernel = mat3(-1, -1, -1,
+                          -1, 8, -1,
+                          -1, -1, -1);
+      return kernel[x][y];
+    }
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float laplaValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2.);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      //laplacian filter
+      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+          {
+            pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            laplaValue = Laplacian(i, j);
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*laplaValue;
+            } else {
+                num_texels -= 1.0;
+            }
+          }
+      textureValue /= num_texels;
+      out_FragColor = textureValue;
+  }
+    </script>
+
   <script id="fragShader_TrueAnaglyphs" type="shader">
     precision highp float;
     uniform sampler2D image;
@@ -65,25 +151,6 @@
       float halfWidth = float(texSize.x / 2); 
       textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
       textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
-
-      
-
-      // Be careful! It is not work
-      //vec3 rgb_a = vec3(0.,0.,0.);
-      //vec3 rgb_1 = vec3(textureValue_l.r, textureValue_l.g, textureValue_l.b); // left image
-      //vec3 rgb_2 = vec3(textureValue_r.r, textureValue_r.g, textureValue_r.b); // right image
-      //mat3 matrix_1 = mat3(
-      //  0.299, 0.587, 0.114,
-      //  0.0,   0.0,   0.0,
-      //  0.0,   0.0,   0.0
-      //);
-      //mat3 matrix_2 = mat3(
-      //  0.0,   0.0,   0.0,
-      //  0.0,   0.0,   0.0,
-      //  0.299, 0.587, 0.114
-      //);
-      //rgb_a = matrix_1 * rgb_1 + matrix_2 * rgb_2;
-
       
       if (gl_FragCoord.x > halfWidth){
         out_FragColor = textureValue_l;
@@ -265,12 +332,12 @@
 
     var camera, controls, scene, renderer, container;
     var context, canvas;
-    var plan_imageProcessing, plan;
+    var plan_imageProcessing, plan, plan_anaglyphs;
 
     // VIDEO AND THE ASSOCIATED TEXTURE
     var video, videoTexture;
 
-    var imageProcessing, imageProcessingMaterial;
+    var imageProcessing, imageProcessingMaterial, anaglyphs, anaglyphsMaterial;
 
     // GUI
     var gui;
@@ -308,7 +375,8 @@
         0.001,
         10
       );
-      camera.position.z = 1.0;
+      camera.position.set(-1, 0, 1);
+      camera.lookAt(0, 0, 0);
       controls = new OrbitControls(camera, renderer.domElement);
       controls.minDistance = 0.005;
       controls.maxDistance = 2.0;
@@ -338,43 +406,69 @@
           fragmentShader: document.getElementById("fragShader").text,
           glslVersion: THREE.GLSL3, // many things changes deppending on the version
         });
-
         imageProcessing = new IVimageProcessing(
           video.videoHeight,
           video.videoWidth,
           imageProcessingMaterial
         );
 
-        console.log(imageProcessing.width);
+        anaglyphsMaterial = new THREE.RawShaderMaterial({
+          uniforms: {
+            image: { type: "t", value: imageProcessing.rtt.texture },
+            // image: { type: "t", value: videoTexture },
+          },
+          vertexShader: document.getElementById("vertShader").text,
+          fragmentShader: document.getElementById("fragShader").text,
+          glslVersion: THREE.GLSL3, // many things changes deppending on the version
+        });
+        anaglyphs = new IVimageProcessing(
+          video.videoHeight,
+          video.videoWidth,
+          anaglyphsMaterial
+        );
+        // console.log(imageProcessing.width);
 
         var geometry = new THREE.PlaneGeometry(
           1,
           video.videoHeight / video.videoWidth
         );
-        var material = new THREE.MeshBasicMaterial({
-          map: imageProcessing.rtt.texture,
-          side: THREE.DoubleSide,
-        });
-        plan_imageProcessing = new THREE.Mesh(geometry, material);
-        plan_imageProcessing.position.z = 0.15;
-        plan_imageProcessing.receiveShadow = false;
-        plan_imageProcessing.castShadow = false;
-        scene.add(plan_imageProcessing);
 
-        var geometry2 = new THREE.PlaneGeometry(
-          1,
-          video.videoHeight / video.videoWidth
-        );
-        var material2 = new THREE.MeshBasicMaterial({
+        // Original video
+        var material_original = new THREE.MeshBasicMaterial({
           map: videoTexture,
           side: THREE.DoubleSide,
         });
-        plan = new THREE.Mesh(geometry2, material2);
+        plan = new THREE.Mesh(geometry, material_original);
         plan.position.z = -0.15;
         plan.receiveShadow = false;
         plan.castShadow = false;
         scene.add(plan);
 
+        // Image processing
+        var material_imageProcessing = new THREE.MeshBasicMaterial({
+          map: imageProcessing.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_imageProcessing = new THREE.Mesh(geometry, material_imageProcessing);
+        plan_imageProcessing.position.z = 0.15;
+        plan_imageProcessing.receiveShadow = false;
+        plan_imageProcessing.castShadow = false;
+        scene.add(plan_imageProcessing);
+
+        // Anaglyph 
+        var material_anaglyphs = new THREE.MeshBasicMaterial({
+          map: anaglyphs.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_anaglyphs = new THREE.Mesh(geometry, material_anaglyphs);
+        plan_anaglyphs.position.z = 0.45;
+        plan_anaglyphs.receiveShadow = false;
+        plan_anaglyphs.castShadow = false;
+        scene.add(plan_anaglyphs);
+
+        
+
+        // GUI
         var pausePlayObj = {
           pausePlay: function () {
             if (!video.paused) {
@@ -396,38 +490,58 @@
         gui.add(pausePlayObj, "add10sec").name("Add 10 seconds");
 
         // change image processing
-        function updateFragmentShader(newShader) {
+        function updateFragmentShader_im_processing(newShader) {
           imageProcessingMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
           imageProcessingMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
-          console.log("Shader updated");
+          console.log("Shader updated(image processing)");
+        }
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian'])//({key: initial value}, 'key', [list of values])
+          .name('Image Processing') // .name('display name').
+          .onChange(value => { // .onChange(selected value)
+            switch (value) { // action based on selected value
+              case 'Normal fragment shader':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader').textContent);
+                break;
+              case '1 Conv gauss':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_gauss').textContent);
+                break;
+              case '1 Conv laplacian':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_lapla').textContent);
+                break;
+            }
+          });
+        function updateFragmentShader_anaglyphs(newShader) {
+          anaglyphsMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
+          anaglyphsMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
+          //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          console.log("Shader updated(anaglyphs)");
         }
         gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', 'True', 'Gray', 'Color', 'Half Color', 'Optimized'])//({key: initial value}, 'key', [list of values])
           .name('Anaglyphs') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value
               case 'Normal fragment shader':
-                updateFragmentShader(document.getElementById('fragShader').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader').textContent);
                 break;
               case 'True':
-                updateFragmentShader(document.getElementById('fragShader_TrueAnaglyphs').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_TrueAnaglyphs').textContent);
                 break;
               case 'Gray':
-                updateFragmentShader(document.getElementById('fragShader_GrayAnaglyphs').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_GrayAnaglyphs').textContent);
                 break;
               case 'Color':
-                updateFragmentShader(document.getElementById('fragShader_ColorAnaglyphs').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_ColorAnaglyphs').textContent);
                 break;
               case 'Half Color':
-                updateFragmentShader(document.getElementById('fragShader_HalfColorAnaglyphs').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_HalfColorAnaglyphs').textContent);
                 break;
               case 'Optimized':
-                updateFragmentShader(document.getElementById('fragShader_OptimizedAnaglyphs').textContent);
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_OptimizedAnaglyphs').textContent);
                 break;
 
             }
           });
-
         video.play();
       };
 
@@ -439,6 +553,11 @@
 
       if (typeof imageProcessing !== "undefined")
         IVprocess(imageProcessing, renderer);
+      
+      if (typeof anaglyphs !== "undefined") {
+        IVprocess(anaglyphs, renderer);
+      }
+
       renderer.render(scene, camera);
     }
 
