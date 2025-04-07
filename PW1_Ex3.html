@@ -65,8 +65,6 @@
       return exp(-(x * x + y * y)/ (2.0 * sigma * sigma)) / (2.0 * 3.14159265 * sigma * sigma);
     }
 
-    //TODO make several image processing materials
-
     void main(void) {
       vec4 textureValue = vec4 ( 0,0,0,0 );
       vec4 texelValue = vec4 ( 0,0,0,0 );
@@ -185,6 +183,70 @@
         }
       }
       out_FragColor = textureValue;
+  }
+    </script>
+  
+  <script id="fragShader_median_denoising" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    const int kernel_size = 3; // 2D kernel size
+    const int kernel_size_flattened = kernel_size * kernel_size; // 1D kernel size
+    vec4 kernel[kernel_size_flattened];
+  
+    vec4 findMedian(vec4 values[kernel_size_flattened]) {
+      // Bubble sort (inefficient but OK for small arrays)
+      for (int i = 0; i < kernel_size_flattened - 1; ++i) {
+          for (int j = i + 1; j < kernel_size_flattened; ++j) {
+              if (values[j].r < values[i].r) {
+                  float temp = values[i].r;
+                  values[i].r = values[j].r;
+                  values[j].r = temp;
+              }
+              if (values[j].g < values[i].g) {
+                float temp = values[i].g;
+                values[i].g = values[j].g;
+                values[j].g = temp;
+              }
+              if (values[j].b < values[i].b) {
+                float temp = values[i].b;
+                values[i].b = values[j].b;
+                values[j].b = temp;
+              }
+              if (values[j].a < values[i].a) {
+                float temp = values[i].a;
+                values[i].a = values[j].a;
+                values[j].a = temp;
+              }
+          }
+      }
+      return values[kernel_size_flattened/2]; // Middle index for 9 elements
+    }
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float gaussValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      //Median filter
+      int k = 0;
+      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+        {
+          pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+          texelValue = texelFetch( image, pointPosition, 0 );
+          if (texelValue != vec4 ( 0,0,0,0 )){
+            kernel[k] = texelValue;
+            k++;
+          }
+        }
+      out_FragColor = findMedian(kernel);
+
+
   }
     </script>
 
@@ -434,8 +496,8 @@
       controls.update();
 
       video = document.createElement("video");
-      // video.src = "Moon_HansZimmer.mp4";
-      video.src = "SanFrancisco.mp4";
+      video.src = "Moon_HansZimmer.mp4";
+      // video.src = "SanFrancisco.mp4";
       video.load();
       video.muted = true;
       video.loop = true;
@@ -583,7 +645,7 @@
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
           console.log("Shader updated(separable)");
         }
-        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian', '2 Separable'])//({key: initial value}, 'key', [list of values])
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian', '2 Separable', '3 Median denoising'])//({key: initial value}, 'key', [list of values])
           .name('Image Processing') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value
@@ -598,6 +660,9 @@
                 break;
               case '2 Separable':
                 updateFragmentShader_separable(document.getElementById('fragShader_conv_separable').textContent);
+                break;
+              case '3 Median denoising':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_median_denoising').textContent);
                 break;
             }
           });
