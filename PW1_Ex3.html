@@ -102,9 +102,7 @@
     precision highp float;
     uniform sampler2D image;
     out vec4 out_FragColor;
-
-    float sigma = 0.8;
-    float kernel_size = 3.0;
+    float kernel_size = 3.0; // Always zero if it is laplacian filter
 
     float Laplacian(int x, int y) {
       mat3 kernel = mat3(-1, -1, -1,
@@ -135,6 +133,57 @@
             }
           }
       textureValue /= num_texels;
+      out_FragColor = textureValue;
+  }
+    </script>
+
+  <script id="fragShader_conv_separable" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    uniform float HorV; // 0.0: horizontal, 1.0: vertical
+    out vec4 out_FragColor;
+    float kernel_size = 20.0; // Always zero if it is laplacian filter
+
+    // average convolution
+    float Separable(float kernel_size) {
+      return 1. / kernel_size;
+    }
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float separableValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2.);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      separableValue = Separable(kernel_size);
+      // horizontal
+      if (HorV == 0.0) { 
+        for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        {
+          pointPosition = ivec2(i+int(gl_FragCoord.x), int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*separableValue;
+            } else {
+                num_texels -= 1.0;
+            }
+        }
+      // vertical
+      } else { 
+        //sizeDiv2 = int(10. / 2.);
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+        {
+          pointPosition = ivec2(int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*separableValue;
+            } else {
+                num_texels -= 1.0;
+            }
+        }
+      }
       out_FragColor = textureValue;
   }
     </script>
@@ -332,12 +381,12 @@
 
     var camera, controls, scene, renderer, container;
     var context, canvas;
-    var plan_imageProcessing, plan, plan_anaglyphs;
+    var plan_imageProcessing, plan, plan_anaglyphs, plan_separableProcessing;
 
     // VIDEO AND THE ASSOCIATED TEXTURE
     var video, videoTexture;
 
-    var imageProcessing, imageProcessingMaterial, anaglyphs, anaglyphsMaterial;
+    var imageProcessing, imageProcessingMaterial, anaglyphs, anaglyphsMaterial, separableProcessing, separableProcessingMaterial;
 
     // GUI
     var gui;
@@ -385,8 +434,8 @@
       controls.update();
 
       video = document.createElement("video");
-      video.src = "Moon_HansZimmer.mp4";
-      // video.src = "SanFrancisco.mp4";
+      // video.src = "Moon_HansZimmer.mp4";
+      video.src = "SanFrancisco.mp4";
       video.load();
       video.muted = true;
       video.loop = true;
@@ -398,9 +447,11 @@
         videoTexture.generateMipmaps = false;
         videoTexture.format = THREE.RGBAFormat;
 
+        //TODO: change input value(videoTexture) by gui, make another plan to show only horizontal
         imageProcessingMaterial = new THREE.RawShaderMaterial({
           uniforms: {
             image: { type: "t", value: videoTexture },
+            HorV: { value: 0.0 }, // 0.0: horizontal, 1.0: vertical
           },
           vertexShader: document.getElementById("vertShader").text,
           fragmentShader: document.getElementById("fragShader").text,
@@ -410,6 +461,22 @@
           video.videoHeight,
           video.videoWidth,
           imageProcessingMaterial
+        );
+
+        // Separable processing
+        separableProcessingMaterial = new THREE.RawShaderMaterial({
+          uniforms: {
+            image: { type: "t", value: imageProcessing.rtt.texture },
+            HorV: { value: 1.0 }, // 0.0: horizontal, 1.0: vertical
+          },
+          vertexShader: document.getElementById("vertShader").text,
+          fragmentShader: document.getElementById("fragShader_conv_separable").text,
+          glslVersion: THREE.GLSL3, // many things changes deppending on the version
+        });
+        separableProcessing = new IVimageProcessing(
+          video.videoHeight,
+          video.videoWidth,
+          separableProcessingMaterial
         );
 
         anaglyphsMaterial = new THREE.RawShaderMaterial({
@@ -455,6 +522,18 @@
         plan_imageProcessing.castShadow = false;
         scene.add(plan_imageProcessing);
 
+        // Separable processing(horizontal)
+        var material_separableProcessing = new THREE.MeshBasicMaterial({
+          map: separableProcessing.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_separableProcessing = new THREE.Mesh(geometry, material_separableProcessing);
+        plan_separableProcessing.position.z = 0.15;
+        plan_separableProcessing.position.y = 0.6;
+        plan_separableProcessing.receiveShadow = false;
+        plan_separableProcessing.castShadow = false;
+        // scene.add(plan_separableProcessing);
+
         // Anaglyph 
         var material_anaglyphs = new THREE.MeshBasicMaterial({
           map: anaglyphs.rtt.texture,
@@ -494,9 +573,17 @@
           imageProcessingMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
           imageProcessingMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          anaglyphsMaterial.uniforms.image.value = imageProcessing.rtt.texture;
           console.log("Shader updated(image processing)");
         }
-        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian'])//({key: initial value}, 'key', [list of values])
+        function updateFragmentShader_separable(newShader) {
+          imageProcessingMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
+          imageProcessingMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
+          anaglyphsMaterial.uniforms.image.value = separableProcessing.rtt.texture;
+          //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          console.log("Shader updated(separable)");
+        }
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian', '2 Separable'])//({key: initial value}, 'key', [list of values])
           .name('Image Processing') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value
@@ -508,6 +595,9 @@
                 break;
               case '1 Conv laplacian':
                 updateFragmentShader_im_processing(document.getElementById('fragShader_conv_lapla').textContent);
+                break;
+              case '2 Separable':
+                updateFragmentShader_separable(document.getElementById('fragShader_conv_separable').textContent);
                 break;
             }
           });
@@ -553,10 +643,15 @@
 
       if (typeof imageProcessing !== "undefined")
         IVprocess(imageProcessing, renderer);
-      
+
+      if (typeof separableProcessing !== "undefined") {
+        IVprocess(separableProcessing, renderer); 
+      }
+
       if (typeof anaglyphs !== "undefined") {
         IVprocess(anaglyphs, renderer);
       }
+
 
       renderer.render(scene, camera);
     }
