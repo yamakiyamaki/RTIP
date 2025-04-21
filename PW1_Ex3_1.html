@@ -478,7 +478,7 @@
         plan_separableProcessing.position.z = 0.45;
         plan_separableProcessing.receiveShadow = false;
         plan_separableProcessing.castShadow = false;
-        scene.add(plan_separableProcessing);
+        // scene.add(plan_separableProcessing);
 
         // Anaglyph 
         var material_anaglyphs = new THREE.MeshBasicMaterial({
@@ -529,7 +529,7 @@
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
           console.log("Shader updated(separable)");
         }
-        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '4 GaussPlusLaplacian'])//({key: initial value}, 'key', [list of values])
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '1 Conv gauss', '1 Conv laplacian'])//({key: initial value}, 'key', [list of values])
           .name('Image Processing') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value

@@ -67,33 +67,56 @@
 
     void main(void) {
       ivec2 texSize = textureSize(image, 0);
-      float halfWidth = float(texSize.x / 2); 
+      int halfWidth = texSize.x / 2; 
       vec4 textureValue = vec4 ( 0,0,0,0 );
       vec4 texelValue = vec4 ( 0,0,0,0 );
       ivec2 pointPosition = ivec2(0,0);
+      ivec2 mirrorPosition = ivec2(0,0);
       float gaussValue = 0.0;
       int sizeDiv2 = int(kernel_size / 2.);
-      //float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
 
       //Gaussian filter
       for (int i=-sizeDiv2;i<=sizeDiv2;i++)
         for (int j=-sizeDiv2;j<=sizeDiv2;j++)
         {
+          // Taking care about edges and center.
           pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
-          texelValue = texelFetch( image, pointPosition, 0 );
+          if (pointPosition.x < 0) {
+            mirrorPosition = ivec2(abs(pointPosition.x-1), pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (pointPosition.x > texSize.x) {
+            mirrorPosition = ivec2(texSize.x-pointPosition.x+1, pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (pointPosition.y < 0) {
+            mirrorPosition = ivec2(pointPosition.x, abs(pointPosition.y-1));
+            texelValue = texelFetch( image, pointPosition, 0 );
+          } else if (pointPosition.y > texSize.y) {
+            mirrorPosition = ivec2(pointPosition.x, texSize.y-pointPosition.y+1);
+            texelValue = texelFetch( image, pointPosition, 0 );
+          } else if (int(gl_FragCoord.x) <= halfWidth){
+            if ( halfWidth-pointPosition.x >= 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, mirrorPosition, 0 );
+            }
+          } else if (int(gl_FragCoord.x) > halfWidth){
+            if ( pointPosition.x-halfWidth > 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, pointPosition, 0 );
+            }
+          } else {
+            texelValue = texelFetch( image, pointPosition, 0 );
+          }
           gaussValue = Gaussian(float(i), float(j), sigma);
           textureValue += texelValue*gaussValue;
-          if (texelValue != vec4 ( 0,0,0,0 )){
-            textureValue += texelValue*gaussValue;
-          } 
-          //else {
-          //  num_texels -= 1.0;
-          //}
+          
         }
-      //textureValue /= float ((sizeDiv2*2+1)*(sizeDiv2*2+1)); // sum / numbers = average
-      //textureValue /= num_texels;
-      //out_FragColor = textureValue*norm;
       out_FragColor = textureValue;
+
+
   }
     </script>
   
@@ -102,7 +125,6 @@
     uniform sampler2D image;
     out vec4 out_FragColor;
     float kernel_size = 3.0; // Always zero if it is laplacian filter
-    float norm = 10.0;
 
     float Laplacian(int x, int y) {
       mat3 kernel = mat3(-1, -1, -1,
@@ -112,29 +134,217 @@
     }
 
     void main(void) {
+      ivec2 texSize = textureSize(image, 0);
+      int halfWidth = texSize.x / 2;  
       vec4 textureValue = vec4 ( 0,0,0,0 );
       vec4 texelValue = vec4 ( 0,0,0,0 );
       ivec2 pointPosition = ivec2(0,0);
+      ivec2 mirrorPosition = ivec2(0,0);
       float laplaValue = 0.0;
       int sizeDiv2 = int(kernel_size / 2.);
-      //float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
 
       //laplacian filter
       for (int i=-sizeDiv2;i<=sizeDiv2;i++)
         for (int j=-sizeDiv2;j<=sizeDiv2;j++)
           {
+            // Taking care about edges and center.
             pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
-            texelValue = texelFetch( image, pointPosition, 0 );
+            if (pointPosition.x < 0) {
+              mirrorPosition = ivec2(abs(pointPosition.x-1), pointPosition.y);
+              texelValue = texelFetch( image, mirrorPosition, 0 );
+            } else if (pointPosition.x > texSize.x) {
+              mirrorPosition = ivec2(texSize.x-pointPosition.x+1, pointPosition.y);
+              texelValue = texelFetch( image, mirrorPosition, 0 );
+            } else if (pointPosition.y < 0) {
+              mirrorPosition = ivec2(pointPosition.x, abs(pointPosition-1));
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else if (pointPosition.y > texSize.y) {
+              mirrorPosition = ivec2(pointPosition.x, texSize.y-pointPosition.y+1);
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else if (int(gl_FragCoord.x) <= halfWidth){
+              if ( halfWidth-pointPosition.x >= 0){
+                texelValue = texelFetch( image, pointPosition, 0 );
+              } else {
+                mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+                texelValue = texelFetch( image, mirrorPosition, 0 );
+              }
+            } else if (int(gl_FragCoord.x) > halfWidth){
+              if ( pointPosition.x-halfWidth > 0){
+                texelValue = texelFetch( image, pointPosition, 0 );
+              } else {
+                mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+                texelValue = texelFetch( image, pointPosition, 0 );
+              }
+            } else {
+              texelValue = texelFetch( image, pointPosition, 0 );
+            }
             laplaValue = Laplacian(i, j);
-            if (texelValue != vec4 ( 0,0,0,0 )){
-                textureValue += texelValue*laplaValue;
-            } 
+            textureValue += texelValue*laplaValue;
           }
-      //textureValue /= num_texels;
       out_FragColor = textureValue;
   }
     </script>
 
+  <script id="fragShader_conv_separable" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    uniform float HorV; // 0.0: horizontal, 1.0: vertical
+    out vec4 out_FragColor;
+    float kernel_size = 20.0; // Always zero if it is laplacian filter
+
+    // average convolution
+    float Separable(float kernel_size) {
+      return 1. / kernel_size;
+    }
+
+    void main(void) {
+      ivec2 texSize = textureSize(image, 0);
+      int halfWidth = texSize.x / 2; 
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      ivec2 mirrorPosition = ivec2(0,0);
+      float separableValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2.);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      separableValue = Separable(kernel_size);
+      // horizontal
+      if (HorV == 0.0) { 
+        for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        {
+
+          pointPosition = ivec2(i+int(gl_FragCoord.x), int(gl_FragCoord.y));
+          if (pointPosition.x < 0) {
+            mirrorPosition = ivec2(abs(pointPosition.x-1), pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (pointPosition.x > texSize.x) {
+            mirrorPosition = ivec2(texSize.x-pointPosition.x+1, pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (int(gl_FragCoord.x) <= halfWidth){
+            if ( halfWidth-pointPosition.x >= 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, mirrorPosition, 0 );
+            }
+          } else if (int(gl_FragCoord.x) > halfWidth){
+            if ( pointPosition.x-halfWidth > 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, pointPosition, 0 );
+            }
+          } else {
+            texelValue = texelFetch( image, pointPosition, 0 );
+          }
+          textureValue += texelValue*separableValue;
+        }
+      // vertical
+      } else { 
+        //sizeDiv2 = int(10. / 2.);
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+        {
+          pointPosition = ivec2(int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+          if (pointPosition.x < 0) {
+            mirrorPosition = ivec2(abs(pointPosition.x-1), pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (pointPosition.x > texSize.x) {
+            mirrorPosition = ivec2(texSize.x-pointPosition.x+1, pointPosition.y);
+            texelValue = texelFetch( image, mirrorPosition, 0 );
+          } else if (pointPosition.y < 0) {
+            mirrorPosition = ivec2(pointPosition.x, abs(pointPosition-1));
+            texelValue = texelFetch( image, pointPosition, 0 );
+          } else if (pointPosition.y > texSize.y) {
+            mirrorPosition = ivec2(pointPosition.x, texSize.y-pointPosition.y+1);
+            texelValue = texelFetch( image, pointPosition, 0 );
+          } else if (int(gl_FragCoord.x) <= halfWidth){
+            if ( halfWidth-pointPosition.x >= 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, mirrorPosition, 0 );
+            }
+          } else if (int(gl_FragCoord.x) > halfWidth){
+            if ( pointPosition.x-halfWidth > 0){
+              texelValue = texelFetch( image, pointPosition, 0 );
+            } else {
+              mirrorPosition = ivec2(halfWidth-pointPosition.x+1+halfWidth, pointPosition.y);
+              texelValue = texelFetch( image, pointPosition, 0 );
+            }
+          } else {
+            texelValue = texelFetch( image, pointPosition, 0 );
+          }
+          textureValue += texelValue*separableValue;
+        }
+      }
+      out_FragColor = textureValue;
+  }
+    </script>
+  
+  <script id="fragShader_median_denoising" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    const int kernel_size = 3; // 2D kernel size
+    const int kernel_size_flattened = kernel_size * kernel_size; // 1D kernel size
+    vec4 kernel[kernel_size_flattened];
+  
+    vec4 findMedian(vec4 values[kernel_size_flattened]) {
+      // Bubble sort (inefficient but OK for small arrays)
+      for (int i = 0; i < kernel_size_flattened - 1; ++i) {
+          for (int j = i + 1; j < kernel_size_flattened; ++j) {
+              if (values[j].r < values[i].r) {
+                  float temp = values[i].r;
+                  values[i].r = values[j].r;
+                  values[j].r = temp;
+              }
+              if (values[j].g < values[i].g) {
+                float temp = values[i].g;
+                values[i].g = values[j].g;
+                values[j].g = temp;
+              }
+              if (values[j].b < values[i].b) {
+                float temp = values[i].b;
+                values[i].b = values[j].b;
+                values[j].b = temp;
+              }
+              if (values[j].a < values[i].a) {
+                float temp = values[i].a;
+                values[i].a = values[j].a;
+                values[j].a = temp;
+              }
+          }
+      }
+      return values[kernel_size_flattened/2]; // Middle index for 9 elements
+    }
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float gaussValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      //Median filter
+      int k = 0;
+      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+        {
+          pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+          texelValue = texelFetch( image, pointPosition, 0 );
+          if (texelValue != vec4 ( 0,0,0,0 )){
+            kernel[k] = texelValue;
+            k++;
+          }
+        }
+      out_FragColor = findMedian(kernel);
+
+
+  }
+    </script>
 
   <script id="fragShader_TrueAnaglyphs" type="shader">
     precision highp float;
@@ -382,7 +592,7 @@
       controls.update();
 
       video = document.createElement("video");
-      // video.src = "Moon_HansZimmer.mp4";
+      //video.src = "Moon_HansZimmer.mp4";
       video.src = "SanFrancisco.mp4";
       video.load();
       video.muted = true;
@@ -529,7 +739,7 @@
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
           console.log("Shader updated(separable)");
         }
-        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '4 GaussPlusLaplacian'])//({key: initial value}, 'key', [list of values])
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['1 Conv gauss', '1 Conv laplacian', '2 Separable', '3 Median denoising', '4 GaussPlusLaplacian'])//({key: initial value}, 'key', [list of values])
           .name('Image Processing') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value

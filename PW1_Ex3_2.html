@@ -53,89 +53,52 @@
   }
     </script>
 
-  <script id="fragShader_conv_gauss" type="shader">
+  <script id="fragShader_conv_separable" type="shader">
     precision highp float;
     uniform sampler2D image;
+    uniform float HorV; // 0.0: horizontal, 1.0: vertical
     out vec4 out_FragColor;
+    float kernel_size = 20.0; // Always zero if it is laplacian filter
 
-    float sigma = 0.8;
-    float kernel_size = 10.0;
-
-    float Gaussian(float x, float y, float sigma) {
-      return exp(-(x * x + y * y)/ (2.0 * sigma * sigma)) / (2.0 * 3.14159265 * sigma * sigma);
+    // average convolution
+    float Separable(float kernel_size) {
+      return 1. / kernel_size;
     }
 
     void main(void) {
-      ivec2 texSize = textureSize(image, 0);
-      float halfWidth = float(texSize.x / 2); 
       vec4 textureValue = vec4 ( 0,0,0,0 );
       vec4 texelValue = vec4 ( 0,0,0,0 );
       ivec2 pointPosition = ivec2(0,0);
-      float gaussValue = 0.0;
+      float separableValue = 0.0;
       int sizeDiv2 = int(kernel_size / 2.);
-      //float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
 
-      //Gaussian filter
-      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+      separableValue = Separable(kernel_size);
+      // horizontal
+      if (HorV == 0.0) { 
+        for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        {
+          pointPosition = ivec2(i+int(gl_FragCoord.x), int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*separableValue;
+            } 
+        }
+      // vertical
+      } else { 
+        //sizeDiv2 = int(10. / 2.);
         for (int j=-sizeDiv2;j<=sizeDiv2;j++)
         {
-          pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
-          texelValue = texelFetch( image, pointPosition, 0 );
-          gaussValue = Gaussian(float(i), float(j), sigma);
-          textureValue += texelValue*gaussValue;
-          if (texelValue != vec4 ( 0,0,0,0 )){
-            textureValue += texelValue*gaussValue;
-          } 
-          //else {
-          //  num_texels -= 1.0;
-          //}
+          pointPosition = ivec2(int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+            texelValue = texelFetch( image, pointPosition, 0 );
+            if (texelValue != vec4 ( 0,0,0,0 )){
+                textureValue += texelValue*separableValue;
+            } 
         }
-      //textureValue /= float ((sizeDiv2*2+1)*(sizeDiv2*2+1)); // sum / numbers = average
-      //textureValue /= num_texels;
-      //out_FragColor = textureValue*norm;
+      }
       out_FragColor = textureValue;
   }
     </script>
   
-  <script id="fragShader_conv_lapla" type="shader">
-    precision highp float;
-    uniform sampler2D image;
-    out vec4 out_FragColor;
-    float kernel_size = 3.0; // Always zero if it is laplacian filter
-    float norm = 10.0;
-
-    float Laplacian(int x, int y) {
-      mat3 kernel = mat3(-1, -1, -1,
-                          -1, 8, -1,
-                          -1, -1, -1);
-      return kernel[x][y];
-    }
-
-    void main(void) {
-      vec4 textureValue = vec4 ( 0,0,0,0 );
-      vec4 texelValue = vec4 ( 0,0,0,0 );
-      ivec2 pointPosition = ivec2(0,0);
-      float laplaValue = 0.0;
-      int sizeDiv2 = int(kernel_size / 2.);
-      //float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
-
-      //laplacian filter
-      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
-        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
-          {
-            pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
-            texelValue = texelFetch( image, pointPosition, 0 );
-            laplaValue = Laplacian(i, j);
-            if (texelValue != vec4 ( 0,0,0,0 )){
-                textureValue += texelValue*laplaValue;
-            } 
-          }
-      //textureValue /= num_texels;
-      out_FragColor = textureValue;
-  }
-    </script>
-
-
   <script id="fragShader_TrueAnaglyphs" type="shader">
     precision highp float;
     uniform sampler2D image;
@@ -529,7 +492,7 @@
           //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
           console.log("Shader updated(separable)");
         }
-        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '4 GaussPlusLaplacian'])//({key: initial value}, 'key', [list of values])
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '2 Separable'])//({key: initial value}, 'key', [list of values])
           .name('Image Processing') // .name('display name').
           .onChange(value => { // .onChange(selected value)
             switch (value) { // action based on selected value
