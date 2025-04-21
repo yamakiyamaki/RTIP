@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+
+      margin: 0;
+      overflow: hidden;
+      background-color: #aaaaaa;
+      background-attachment: fixed !important;
+    }
+  </style>
+  <style>
+    body {
+      font-family: Monospace;
+      margin: 0px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <script id="vertShader" type="shader">
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    precision highp float;
+
+    in vec3 position;
+
+    void main() {
+        gl_Position = projectionMatrix *
+                      modelViewMatrix * vec4(position, 1.0 );
+      }
+    </script>
+
+  <script id="fragShader" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      textureValue = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      out_FragColor = vec4(1.0)*textureValue;
+
+  }
+    </script>
+
+  <script id="fragShader_median_denoising" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    const int kernel_size = 3; // 2D kernel size
+    const int kernel_size_flattened = kernel_size * kernel_size; // 1D kernel size
+    vec4 kernel[kernel_size_flattened];
+  
+    vec4 findMedian(vec4 values[kernel_size_flattened]) {
+      // Bubble sort (inefficient but OK for small arrays)
+      for (int i = 0; i < kernel_size_flattened - 1; ++i) {
+          for (int j = i + 1; j < kernel_size_flattened; ++j) {
+              if (values[j].r < values[i].r) {
+                  float temp = values[i].r;
+                  values[i].r = values[j].r;
+                  values[j].r = temp;
+              }
+              if (values[j].g < values[i].g) {
+                float temp = values[i].g;
+                values[i].g = values[j].g;
+                values[j].g = temp;
+              }
+              if (values[j].b < values[i].b) {
+                float temp = values[i].b;
+                values[i].b = values[j].b;
+                values[j].b = temp;
+              }
+              if (values[j].a < values[i].a) {
+                float temp = values[i].a;
+                values[i].a = values[j].a;
+                values[j].a = temp;
+              }
+          }
+      }
+      return values[kernel_size_flattened/2]; // Middle index for 9 elements
+    }
+
+    void main(void) {
+      vec4 textureValue = vec4 ( 0,0,0,0 );
+      vec4 texelValue = vec4 ( 0,0,0,0 );
+      ivec2 pointPosition = ivec2(0,0);
+      float gaussValue = 0.0;
+      int sizeDiv2 = int(kernel_size / 2);
+      float num_texels = float ((sizeDiv2*2+1)*(sizeDiv2*2+1));
+
+      //Median filter
+      int k = 0;
+      for (int i=-sizeDiv2;i<=sizeDiv2;i++)
+        for (int j=-sizeDiv2;j<=sizeDiv2;j++)
+        {
+          pointPosition = ivec2(i+int(gl_FragCoord.x), j+int(gl_FragCoord.y));
+          texelValue = texelFetch( image, pointPosition, 0 );
+          if (texelValue != vec4 ( 0,0,0,0 )){
+            kernel[k] = texelValue;
+            k++;
+          }
+        }
+      out_FragColor = findMedian(kernel);
+
+
+  }
+    </script>
+
+  <script id="fragShader_TrueAnaglyphs" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        vec3 m = vec3(0.299, 0.587, 0.114);
+        float red = m.x * textureValue_l.r + m.y * textureValue_l.g + m.z * textureValue_l.b;
+        float green = 0.;
+        float blue = m.x * textureValue_r.r + m.y * textureValue_r.g + m.z * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
+
+	  }
+    </script>
+
+  <script id="fragShader_GrayAnaglyphs" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        vec3 m = vec3(0.299, 0.587, 0.114);
+        float red = m.x * textureValue_l.r + m.y * textureValue_l.g + m.z * textureValue_l.b;
+        float green = m.x * textureValue_r.r + m.y * textureValue_r.g + m.z * textureValue_r.b;
+        float blue = m.x * textureValue_r.r + m.y * textureValue_r.g + m.z * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
+    }
+    </script>
+
+  <script id="fragShader_ColorAnaglyphs" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        float red = 1. * textureValue_l.r + 0. * textureValue_l.g + 0. * textureValue_l.b;
+        float green = 0. * textureValue_r.r + 1. * textureValue_r.g + 0. * textureValue_r.b;
+        float blue = 0. * textureValue_r.r + 0. * textureValue_r.g + 1. * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
+    }
+    </script>
+
+  <script id="fragShader_HalfColorAnaglyphs" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        vec3 m = vec3(0.299, 0.587, 0.114);
+        float red = m.x * textureValue_l.r + m.y * textureValue_l.g + m.z * textureValue_l.b;
+        float green = 0. * textureValue_r.r + 1. * textureValue_r.g + 0. * textureValue_r.b;
+        float blue = 0. * textureValue_r.r + 0. * textureValue_r.g + 1. * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
+    }
+    </script>
+
+  <script id="fragShader_OptimizedAnaglyphs" type="shader">
+    precision highp float;
+    uniform sampler2D image;
+    out vec4 out_FragColor;
+
+    void main(void) {
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        float red = 0. * textureValue_l.r + 0.7 * textureValue_l.g + 0.3 * textureValue_l.b;
+        float green = 0. * textureValue_r.r + 1. * textureValue_r.g + 0. * textureValue_r.b;
+        float blue = 0. * textureValue_r.r + 0. * textureValue_r.g + 1. * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
+    }
+    </script>
+
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+  <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.172.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.172.0/examples/jsm/"
+        }
+      }
+    </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+    import WEBGL from "three/addons/capabilities/WebGL.js";
+
+    function IVimageProcessing(height, width, imageProcessingMaterial) {
+      this.height = height;
+      this.width = width;
+
+      //3 rtt setup
+      this.scene = new THREE.Scene();
+      this.orthoCamera = new THREE.OrthographicCamera(
+        -1,
+        1,
+        1,
+        -1,
+        1 / Math.pow(2, 53),
+        1
+      );
+
+      //4 create a target texture
+      var options = {
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.FloatType,
+        //            type:THREE.UnsignedByteType,
+        canvas: canvas,
+        context: context,
+      };
+      this.rtt = new THREE.WebGLRenderTarget(width, height, options);
+
+      var geom = new THREE.BufferGeometry();
+      geom.setAttribute(
+        "position",
+        new THREE.BufferAttribute(
+          new Float32Array([
+            -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0,
+          ]),
+          3
+        )
+      );
+      this.scene.add(new THREE.Mesh(geom, imageProcessingMaterial));
+    }
+
+    function IVprocess(imageProcessing, renderer) {
+      renderer.setRenderTarget(imageProcessing.rtt);
+      renderer.render(imageProcessing.scene, imageProcessing.orthoCamera);
+      renderer.setRenderTarget(null);
+    }
+
+    var camera, controls, scene, renderer, container;
+    var context, canvas;
+    var plan_imageProcessing, plan, plan_anaglyphs, plan_separableProcessing;
+
+    // VIDEO AND THE ASSOCIATED TEXTURE
+    var video, videoTexture;
+
+    var imageProcessing, imageProcessingMaterial, anaglyphs, anaglyphsMaterial, separableProcessing, separableProcessingMaterial;
+
+    // GUI
+    var gui;
+
+    init();
+    animate();
+
+    function init() {
+      if (WEBGL.isWebGL2Available() === false) {
+        document.body.appendChild(WEBGL.getWebGL2ErrorMessage());
+      }
+      container = document.createElement("div");
+      document.body.appendChild(container);
+
+      canvas = document.createElement("canvas");
+      context = canvas.getContext("webgl2");
+      document.body.appendChild(canvas);
+
+      scene = new THREE.Scene();
+
+      renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        context: context,
+      }); //, antialias: true, alpha: true } );
+      renderer.autoClear = false;
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = false;
+
+      container.appendChild(renderer.domElement);
+
+      camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.001,
+        10
+      );
+      camera.position.set(-1, 0, 1);
+      camera.lookAt(0, 0, 0);
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.minDistance = 0.005;
+      controls.maxDistance = 2.0;
+      controls.enableRotate = true;
+      controls.addEventListener("change", render);
+      controls.update();
+
+      video = document.createElement("video");
+      // video.src = "Moon_HansZimmer.mp4";
+      video.src = "SanFrancisco.mp4";
+      video.load();
+      video.muted = true;
+      video.loop = true;
+
+      video.onloadeddata = function () {
+        videoTexture = new THREE.VideoTexture(video);
+        videoTexture.minFilter = THREE.NearestFilter;
+        videoTexture.magFilter = THREE.NearestFilter;
+        videoTexture.generateMipmaps = false;
+        videoTexture.format = THREE.RGBAFormat;
+
+        imageProcessingMaterial = new THREE.RawShaderMaterial({
+          uniforms: {
+            image: { type: "t", value: videoTexture },
+            HorV: { value: 0.0 }, // 0.0: horizontal, 1.0: vertical
+          },
+          vertexShader: document.getElementById("vertShader").text,
+          fragmentShader: document.getElementById("fragShader").text,
+          glslVersion: THREE.GLSL3, // many things changes deppending on the version
+        });
+        imageProcessing = new IVimageProcessing(
+          video.videoHeight,
+          video.videoWidth,
+          imageProcessingMaterial
+        );
+
+        // Separable processing
+        separableProcessingMaterial = new THREE.RawShaderMaterial({
+          uniforms: {
+            image: { type: "t", value: imageProcessing.rtt.texture },
+            HorV: { value: 1.0 }, // 0.0: horizontal, 1.0: vertical
+          },
+          vertexShader: document.getElementById("vertShader").text,
+          fragmentShader: document.getElementById("fragShader").text,
+          glslVersion: THREE.GLSL3, // many things changes deppending on the version
+        });
+        separableProcessing = new IVimageProcessing(
+          video.videoHeight,
+          video.videoWidth,
+          separableProcessingMaterial
+        );
+
+        anaglyphsMaterial = new THREE.RawShaderMaterial({
+          uniforms: {
+            image: { type: "t", value: imageProcessing.rtt.texture },
+            // image: { type: "t", value: videoTexture },
+          },
+          vertexShader: document.getElementById("vertShader").text,
+          fragmentShader: document.getElementById("fragShader").text,
+          glslVersion: THREE.GLSL3, // many things changes deppending on the version
+        });
+        anaglyphs = new IVimageProcessing(
+          video.videoHeight,
+          video.videoWidth,
+          anaglyphsMaterial
+        );
+        // console.log(imageProcessing.width);
+
+        var geometry = new THREE.PlaneGeometry(
+          1,
+          video.videoHeight / video.videoWidth
+        );
+
+        // Original video
+        var material_original = new THREE.MeshBasicMaterial({
+          map: videoTexture,
+          side: THREE.DoubleSide,
+        });
+        plan = new THREE.Mesh(geometry, material_original);
+        plan.position.z = -0.15;
+        plan.receiveShadow = false;
+        plan.castShadow = false;
+        scene.add(plan);
+
+        // Image processing
+        var material_imageProcessing = new THREE.MeshBasicMaterial({
+          map: imageProcessing.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_imageProcessing = new THREE.Mesh(geometry, material_imageProcessing);
+        plan_imageProcessing.position.z = 0.15;
+        plan_imageProcessing.receiveShadow = false;
+        plan_imageProcessing.castShadow = false;
+        scene.add(plan_imageProcessing);
+
+        // Separable processing: This plan shows the result of the separable processing(horizontal and vertical) but before the anaglyphs
+        var material_separableProcessing = new THREE.MeshBasicMaterial({
+          map: separableProcessing.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_separableProcessing = new THREE.Mesh(geometry, material_separableProcessing);
+        plan_separableProcessing.position.z = 0.45;
+        plan_separableProcessing.receiveShadow = false;
+        plan_separableProcessing.castShadow = false;
+        // scene.add(plan_separableProcessing);
+
+        // Anaglyph 
+        var material_anaglyphs = new THREE.MeshBasicMaterial({
+          map: anaglyphs.rtt.texture,
+          side: THREE.DoubleSide,
+        });
+        plan_anaglyphs = new THREE.Mesh(geometry, material_anaglyphs);
+        plan_anaglyphs.position.z = 0.8;
+        plan_anaglyphs.receiveShadow = false;
+        plan_anaglyphs.castShadow = false;
+        scene.add(plan_anaglyphs);
+
+        
+
+        // GUI
+        var pausePlayObj = {
+          pausePlay: function () {
+            if (!video.paused) {
+              console.log("pause");
+              video.pause();
+            } else {
+              console.log("play");
+              video.play();
+            }
+          },
+          add10sec: function () {
+            video.currentTime = video.currentTime + 10;
+            console.log(video.currentTime);
+          },
+        };
+
+        gui = new GUI();
+        gui.add(pausePlayObj, "pausePlay").name("Pause/play video");
+        gui.add(pausePlayObj, "add10sec").name("Add 10 seconds");
+
+        // change image processing
+        function updateFragmentShader_im_processing(newShader) {
+          imageProcessingMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
+          imageProcessingMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
+          //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          anaglyphsMaterial.uniforms.image.value = imageProcessing.rtt.texture;
+          console.log("Shader updated(image processing)");
+        }
+        function updateFragmentShader_separable(newShader) {
+          separableProcessingMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
+          separableProcessingMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
+          anaglyphsMaterial.uniforms.image.value = separableProcessing.rtt.texture;
+          //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          console.log("Shader updated(separable)");
+        }
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', '3 Median denoising'])//({key: initial value}, 'key', [list of values])
+          .name('Image Processing') // .name('display name').
+          .onChange(value => { // .onChange(selected value)
+            switch (value) { // action based on selected value
+              case 'Normal fragment shader':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader').textContent);
+                break;
+              case '1 Conv gauss':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_gauss').textContent);
+                break;
+              case '1 Conv laplacian':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_lapla').textContent);
+                break;
+              case '2 Separable':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_separable').textContent); 
+                updateFragmentShader_separable(document.getElementById('fragShader_conv_separable').textContent);
+                break;
+              case '3 Median denoising':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_median_denoising').textContent);
+                break;
+              case '4 GaussPlusLaplacian':
+                updateFragmentShader_im_processing(document.getElementById('fragShader_conv_gauss').textContent);
+                updateFragmentShader_separable(document.getElementById('fragShader_conv_lapla').textContent);
+                break;
+            }
+          });
+        function updateFragmentShader_anaglyphs(newShader) {
+          anaglyphsMaterial.fragmentShader = newShader; // We cannot change the shader directly, so we need to update the material
+          anaglyphsMaterial.needsUpdate = true; // Specifies that the material needs to be recompiled.
+          //imageProcessingMaterial.fragmentShader.dispose();  // Dispose to force recompilation
+          console.log("Shader updated(anaglyphs)");
+        }
+        gui.add({ Anaglyphs: 'Normal fragment shader' }, 'Anaglyphs', ['Normal fragment shader', 'True', 'Gray', 'Color', 'Half Color', 'Optimized'])//({key: initial value}, 'key', [list of values])
+          .name('Anaglyphs') // .name('display name').
+          .onChange(value => { // .onChange(selected value)
+            switch (value) { // action based on selected value
+              case 'Normal fragment shader':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader').textContent);
+                break;
+              case 'True':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_TrueAnaglyphs').textContent);
+                break;
+              case 'Gray':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_GrayAnaglyphs').textContent);
+                break;
+              case 'Color':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_ColorAnaglyphs').textContent);
+                break;
+              case 'Half Color':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_HalfColorAnaglyphs').textContent);
+                break;
+              case 'Optimized':
+                updateFragmentShader_anaglyphs(document.getElementById('fragShader_OptimizedAnaglyphs').textContent);
+                break;
+
+            }
+          });
+        video.play();
+      };
+
+      window.addEventListener("resize", onWindowResize, false);
+    }
+
+    function render() {
+      renderer.clear();
+
+      if (typeof imageProcessing !== "undefined")
+        IVprocess(imageProcessing, renderer);
+
+      if (typeof separableProcessing !== "undefined") {
+        IVprocess(separableProcessing, renderer); 
+      }
+
+      if (typeof anaglyphs !== "undefined") {
+        IVprocess(anaglyphs, renderer);
+      }
+
+
+      renderer.render(scene, camera);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      render();
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      render();
+    }
+  </script>
+</body>
+
+</html>
