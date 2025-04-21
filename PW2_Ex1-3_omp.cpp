@@ -210,7 +210,7 @@ int main( int argc, char** argv )
   cv::imshow("Source Image", source );
 
   auto begin = chrono::high_resolution_clock::now();
-  const int iter = 500;
+  const int iter = 2;
 
   #pragma omp parallel for
   for (int it=0;it<iter;it++)

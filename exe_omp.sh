@@ -1,4 +1,8 @@
 #!/bin/bash
+# RUN THIS COMMAND
+# chmod +x exe_omp.sh     #(<--Only once)
+# ./exe_omp.sh PW2_Ex1-2_omp statue gauss 3.0 0.8
+
 PROGRAM=$1
 IMAGE=$2
 MODE=$3
