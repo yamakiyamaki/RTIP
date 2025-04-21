@@ -59,9 +59,42 @@
     out vec4 out_FragColor;
 
     void main(void) {
-      vec4 textureValue = vec4 ( 0,0,0,0 );
-      textureValue = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
-      out_FragColor = vec4(1.0);
+      vec4 textureValue_l = vec4 ( 0,0,0,0 );
+      vec4 textureValue_r = vec4 ( 0,0,0,0 );
+      ivec2 texSize = textureSize(image, 0);
+      float halfWidth = float(texSize.x / 2); 
+      textureValue_l = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+      textureValue_r = texelFetch( image, ivec2(int(gl_FragCoord.x+halfWidth), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
+
+      
+
+      // Be careful! It is not work
+      //vec3 rgb_a = vec3(0.,0.,0.);
+      //vec3 rgb_1 = vec3(textureValue_l.r, textureValue_l.g, textureValue_l.b); // left image
+      //vec3 rgb_2 = vec3(textureValue_r.r, textureValue_r.g, textureValue_r.b); // right image
+      //mat3 matrix_1 = mat3(
+      //  0.299, 0.587, 0.114,
+      //  0.0,   0.0,   0.0,
+      //  0.0,   0.0,   0.0
+      //);
+      //mat3 matrix_2 = mat3(
+      //  0.0,   0.0,   0.0,
+      //  0.0,   0.0,   0.0,
+      //  0.299, 0.587, 0.114
+      //);
+      //rgb_a = matrix_1 * rgb_1 + matrix_2 * rgb_2;
+
+      
+      if (gl_FragCoord.x > halfWidth){
+        out_FragColor = textureValue_l;
+        
+      }else{
+        vec3 m = vec3(0.299, 0.587, 0.114);
+        float red = m.x * textureValue_l.r + m.y * textureValue_l.g + m.z * textureValue_l.b;
+        float green = 0.;
+        float blue = m.x * textureValue_r.r + m.y * textureValue_r.g + m.z * textureValue_r.b;
+        out_FragColor = vec4(red, green, blue, 1.0);
+      }
 
 	}
     </script>
@@ -100,7 +133,7 @@
     void main(void) {
       vec4 textureValue = vec4 ( 0,0,0,0 );
       textureValue = texelFetch( image, ivec2(int(gl_FragCoord.x), int(gl_FragCoord.y)), 0 ); // ivec2: create 2 int vector
-      out_FragColor = vec4(1.0,10.,1.0,1.0)*textureValue;
+      out_FragColor = vec4(10., 0., 0., 1.0)*textureValue;
 
   }
     </script>
@@ -234,7 +267,7 @@
       controls.update();
 
       video = document.createElement("video");
-      video.src = "video.mp4";
+      video.src = "Moon_HansZimmer.mp4";
       video.load();
       video.muted = true;
       video.loop = true;
