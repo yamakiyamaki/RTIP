@@ -1,0 +1,6 @@
+=== Benchmark Results ===
+Configuration core=1
+Source cols: 540
+Total time: 4.57618 s
+Time for 1 iteration: 0.0457618 s
+IPS: 21.8523
