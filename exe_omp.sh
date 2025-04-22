@@ -14,8 +14,9 @@ g++ "$PROGRAM".cpp -fopenmp `pkg-config opencv4 --cflags` -c
 g++ "$PROGRAM".o  -fopenmp `pkg-config opencv4 --libs` -lstdc++ -o "$PROGRAM"
 
 
-if [ "$MODE" = "gauss" ]; then
-  ./"$PROGRAM" "$IMAGE".jpg "$MODE" "$KSIZE" "$SIGMA"
+if [ "$MODE" = "gauss" ]; then 
+# ./exe_omp.sh PW2_Ex1-2_omp statue gauss 3.0 0.8
+  ./"$PROGRAM" "$IMAGE".jpg "$KSIZE" "$SIGMA"
 else
   ./"$PROGRAM" "$IMAGE".jpg "$MODE"
 fi

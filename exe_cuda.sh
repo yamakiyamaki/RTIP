@@ -1,7 +1,8 @@
 #!/bin/bash
-# RUN THIS COMMAND
-# chmod +x exe_cuda.sh     #(<--Only once)
-# ./exe_cuda.sh PW2_Ex1-2_omp statue result 500 true 
+
+# RUN THIS COMMAND WHEN YOU CREATE THIS .sh FILE
+# chmod +x exe_cuda.sh     
+
 
 PROGRAM=$1
 IMAGE=$2
@@ -10,14 +11,24 @@ ITER=$4
 MODE=$5
 KSIZE=$6
 SIGMA=$7
+FACTOR=$8
+CHECK=$9
 
 /usr/local/cuda/bin/nvcc -O3 "$PROGRAM".cu `pkg-config opencv4 --cflags --libs` "$PROGRAM".cpp -o "$PROGRAM"
+# if [ "$CHECK" = "check" ]; then
+#     # ./exe_cuda.sh PW2_Ex1-2_cuda statue result 500 gauss 3.0 0.8
+#     cuda-memcheck ./"$PROGRAM" "$IMAGE".jpg "$RESULT".png "$ITER" "$KSIZE" "$SIGMA" "$FACTOR"
+#     xdg-open "$RESULT".png
+# fi
 
 if [ "$MODE" = "gauss" ]; then
-  ./"$PROGRAM" "$IMAGE".jpg "$MODE" "$KSIZE" "$SIGMA"
-else
-  ./"$PROGRAM" "$IMAGE".jpg "$RESULT".png "$ITER" "$MODE" # Anaglyphs
-  xdg-open "$RESULT".png
+    # ./exe_cuda.sh PW2_Ex1-2_cuda statue result 500 gauss 3.0 0.8
+    ./"$PROGRAM" "$IMAGE".jpg "$RESULT".png "$ITER" "$KSIZE" "$SIGMA" "$FACTOR"
+    xdg-open "$RESULT".png
+else 
+    # ./exe_cuda.sh PW2_Ex1-1_cuda statue result 500 true 
+    ./"$PROGRAM" "$IMAGE".jpg "$RESULT".png "$ITER" "$MODE" # Anaglyphs
+    xdg-open "$RESULT".png
 fi
 
 # original execution command

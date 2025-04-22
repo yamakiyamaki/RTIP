@@ -12,13 +12,13 @@
 using namespace std;
 using namespace cv;
 
-void startCUDA ( cv::cuda::GpuMat& src,cv::cuda::GpuMat& dst, int modeN );
+void startCUDA ( cv::cuda::GpuMat& src,cv::cuda::GpuMat& dst, float neighborSize, float sigma, float factor );
 
 
 int main( int argc, char** argv )
 {
   cv::Mat_<Vec3f> h_imaRGB = cv::imread(argv[1]);
-  cv::Mat_<Vec3f> h_result  ( h_imaRGB.rows, h_imaRGB.cols/2 ); 
+  cv::Mat_<Vec3f> h_result  ( h_imaRGB.rows, h_imaRGB.cols ); 
 
   for (int i=0;i<h_imaRGB.rows;i++)
     for (int j=0;j<h_imaRGB.cols;j++)
@@ -29,21 +29,17 @@ int main( int argc, char** argv )
 
   d_imaRGB.upload ( h_imaRGB ); // internarly cpp execute cudaMalloc
   d_result.upload ( h_result );
+
+  const float neighborSize = atof(argv[4]);//kernel size
+  const float sigma = atof(argv[5]);
+  const float factor = atof(argv[6]);
   
   auto begin = chrono::high_resolution_clock::now();
-
-  std::string mode = argv[4];
-  int modeN = 0;
-  if (mode == "true") { modeN = 0; } 
-  else if (mode == "gray") { modeN = 1; }
-  else if (mode == "color") { modeN = 2; }
-  else if (mode == "halfColor") { modeN = 3; }
-  else if (mode == "optimized") { modeN = 4; }
 
   int iter = atoi(argv[3]);
   for (int i=0;i<iter;i++)
   {
-    startCUDA(d_imaRGB, d_result, modeN );
+    startCUDA(d_imaRGB, d_result, neighborSize, sigma, factor);
   }
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> diff = end-begin;

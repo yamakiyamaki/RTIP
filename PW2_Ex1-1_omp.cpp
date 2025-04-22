@@ -193,9 +193,10 @@ int main( int argc, char** argv )
   auto begin = chrono::high_resolution_clock::now();
   const int iter = 500;
 
-  #pragma omp parallel for
+  
   for (int it=0;it<iter;it++)
     {
+      #pragma omp parallel for
       for (int i=0;i<source.rows;i++)
       {
 	      for (int j=0;j<source.cols/2;j++)

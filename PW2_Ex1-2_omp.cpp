@@ -46,21 +46,26 @@ void Gaussian_conv(const cv::Mat_<cv::Vec3b>& source, cv::Mat_<cv::Vec3b>& desti
           } else {
             pixelValue = source(y, x);
           }
+          // int y_clamped = std::clamp(i + dy, 0, source.rows - 1);
+          // int x_clamped = std::clamp(j + dx, 0, source.cols - 1);
+          // pixelValue = source(y_clamped, x_clamped);
+
+          pixelValue = source(y, x);
 
 
           float weight = Gaussian(dx, dy, sigma);
-          // weightSum += weight;
+          weightSum += weight;
           for (int c = 0; c < 3; ++c)
               colorSum[c] += weight * pixelValue[c];
       }
   }
 
-  // cv::Vec3b result;
-  // for (int c = 0; c < 3; ++c)
-  //     result[c] = cv::saturate_cast<uchar>(colorSum[c] / weightSum);
-  // destination(i, j) = result;
+  cv::Vec3b result;
+  for (int c = 0; c < 3; ++c)
+      result[c] = cv::saturate_cast<uchar>(colorSum[c] / weightSum);
+  destination(i, j) = result;
 
-  destination(i, j) = colorSum;
+  // destination(i, j) = colorSum;
 }
 
 int main( int argc, char** argv )
@@ -74,27 +79,22 @@ int main( int argc, char** argv )
   auto begin = chrono::high_resolution_clock::now();
   const int iter = 500;
 
-  #pragma omp parallel for
+  
+  const float kSize = atof(argv[2]);//neighbor size
+  const float sigma = atof(argv[3]);
+  
   for (int it=0;it<iter;it++)
     {
+      // cout << it << endl;
+      #pragma omp parallel for
+      // #pragma omp parallel for collapse(2)
       for (int i=0;i<source.rows;i++)
       {
+        // cout << i << endl;
 	      for (int j=0;j<source.cols;j++)
         {
-          // destination(i,j)[c] = 255.0*cos((255-source(i,j)[c])/255.0);
-
-          ///////////////////////////////////////////////////////////////////
-          // You can choose type of anaglyphs by command line
-          ///////////////////////////////////////////////////////////////////
-          std::string mode = argv[2];
-          if (mode == "gauss"){
-            if (argc <= 3) {
-              cout << "Lack of input argument. Usage: ./execute.sh program image mode kSize sigma" << endl;
-            }
-            const float kSize = atof(argv[3]);
-            const float sigma = atof(argv[4]);
-            Gaussian_conv(source, destination, i, j, kSize, sigma);
-          }
+          // Gaussian_conv(source, destination, i, j, neighborSize, sigma);
+          Gaussian_conv(source, destination, i, j, kSize, sigma);
         } 
       }
     }
@@ -105,8 +105,8 @@ int main( int argc, char** argv )
   cv::imshow("Processed Image", destination );
 
   
-  cout << "kSize " << argv[3] << endl;
-  cout << "sigma " << argv[4] << endl;
+  cout << "kSize " << argv[2] << endl;
+  cout << "sigma " << argv[3] << endl;
   cout << "Source cols: " << source.cols << endl;
   cout << "Total time: " << diff.count() << " s" << endl;
   cout << "Time for 1 iteration: " << diff.count()/iter << " s" << endl;
