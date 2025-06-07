@@ -87,7 +87,7 @@ __device__ float determinant(const float cov[3][3]) {
 
 __device__ float calc_kSize_cuda(const cv::cuda::PtrStep<float3>& src,
                                  int rows, int cols, int i, int j, float neighborSize, float factor,
-                                 float* neighbor, int maxNeighborSize
+                                 float* neighbor, int maxNeighborCount, int floatSize
                                 ) {
     const int neighborDiv2 = static_cast<int>(neighborSize / 2.0f);
     // float factor = 10.0f;
@@ -103,11 +103,11 @@ __device__ float calc_kSize_cuda(const cv::cuda::PtrStep<float3>& src,
         for (int dx = -neighborDiv2; dx <= neighborDiv2; ++dx) {
             int y = i + dy;
             int x = j + dx;
-            if (x >= 0 && x < cols && y >= 0 && y < rows) {
+            if (x >= 0 && x < cols && y >= 0 && y < rows) { // avoid out-of-bounds access
                 int idx = n * 3;
-                if (idx + 2 >= maxNeighborSize * 3) break; 
+                if (idx + 2 >= maxNeighborCount * 3) break; 
                 float3 pixel = getPixelSafe(src, x, y, cols, rows);
-                neighbor[idx + 0] = pixel.x;
+                neighbor[idx + 0] = pixel.x; 
                 neighbor[idx + 1] = pixel.y;
                 neighbor[idx + 2] = pixel.z;
                 sum[0] += pixel.x;
@@ -151,9 +151,13 @@ __device__ float Gaussian(float x, float y, float sigma) {
 
 __device__ float3 Gaussian_conv(const cv::cuda::PtrStep<float3> source,
                                 int cols, int rows, int i, int j, float neighborSize, float sigma, float factor,
-                                float* neighbor, int maxNeighborSize)
+                                float* neighbor, int maxNeighborCount, int floatSize
+                                )
 {
-    float kSize = calc_kSize_cuda(source, rows, cols, i, j, neighborSize, factor, neighbor, maxNeighborSize);
+    float kSize = fminf(fmaxf(calc_kSize_cuda(source, rows, cols, i, j, neighborSize, factor, neighbor, maxNeighborCount, floatSize), 3.0f), 15.0f); // Clamp between 3 and 15
+    if (i == 44 && j >= 407 && j <= 410) {
+        printf("Thread (%d, %d): kSize = %f\n", i, j, kSize);
+    }
     // float kSize = 3.0;
     int halfSize = static_cast<int>(kSize / 2.0f);
     float3 colorSum = make_float3(0.0f, 0.0f, 0.0f);
@@ -212,7 +216,7 @@ __device__ float3 Gaussian_conv(const cv::cuda::PtrStep<float3> source,
 __global__ void process(const cv::cuda::PtrStep<float3> src,
                         cv::cuda::PtrStep<float3> dst,
                         int rows, int cols, float neighborSize, float sigma, float factor,
-                        float* d_neighborBuffer, int maxNeighborSize
+                        float* d_neighborBuffer, int maxNeighborCount, int floatSize
                         ) 
 {
 
@@ -224,11 +228,15 @@ __global__ void process(const cv::cuda::PtrStep<float3> src,
     // {
     float3 resultPixel;
     
-    int threadIndex = i * cols + j;
+    int threadIndex = i * cols + j; // Because threadIndex is 1D array
     if (threadIndex >= rows * cols) return;
-    float* neighborPtr = &d_neighborBuffer[threadIndex * maxNeighborSize * 3];
+
+    float* neighborPtr = &d_neighborBuffer[threadIndex * maxNeighborCount * 3]; // 3 colors
+    // If neighborPtr is a float*, then neighborPtr + 1 moves the pointer by 4 bytes (the size of a float).
+    // Each thread calculates its own starting pointer (neighborPtr) based on its threadIndex:
+
     if (neighborPtr == nullptr) return;
-    resultPixel = Gaussian_conv(src, cols, rows, i, j, neighborSize, sigma, factor, neighborPtr, maxNeighborSize);
+    resultPixel = Gaussian_conv(src, cols, rows, i, j, neighborSize, sigma, factor, neighborPtr, maxNeighborCount, floatSize);
 
     // clamp(resultPixel, 0.0, 1.0);
     resultPixel.x = fminf(fmaxf(resultPixel.x, 0.0f), 1.0f);
@@ -252,32 +260,26 @@ void startCUDA(cv::cuda::GpuMat &src, cv::cuda::GpuMat &dst, float neighborSize,
 
     int maxNeighborCount = static_cast<int>(ceil(neighborSize) * ceil(neighborSize));
     int totalPixels = src.rows * src.cols;
-    size_t bufferSize = totalPixels * maxNeighborCount * 3 * sizeof(float);
-    std::cout << "Allocating neighbor buffer of size: " << bufferSize / (1024.0 * 1024.0) << " MB" << std::endl;
-    float* d_neighborBuffer; 
+    int floatSize = sizeof(float);
+    size_t bufferSize = totalPixels * maxNeighborCount * 3 * floatSize; // 3 colors
+    // std::cout << "Allocating neighbor buffer of size: " << bufferSize / (1024.0 * 1024.0) << " MB" << std::endl;
 
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        std::cerr << "CUDA launch failed: " << cudaGetErrorString(err) << std::endl;
-    }
-
-    if (err != cudaSuccess) {
-        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(err) << std::endl;
+    float* d_neighborBuffer;
+    cudaMalloc(&d_neighborBuffer, bufferSize);
+    if (d_neighborBuffer == nullptr) {
+        std::cerr << "cudaMalloc failed for d_neighborBuffer" << std::endl;
         return;
     }
 
-    // std::cout << "rows: " << src.rows << ", cols: " << src.cols << std::endl;
-    // std::cout << "maxNeighborCount: " << maxNeighborCount << std::endl;
-    // std::cout << "totalPixels: " << totalPixels << std::endl;
-    // std::cout << "allocating buffer for: " << (totalPixels * maxNeighborCount * 3 * sizeof(float)) / (1024.0 * 1024.0) << " MB" << std::endl;
-    process<<<grid, block>>>(src, dst, src.rows, src.cols, neighborSize, sigma, factor, d_neighborBuffer, maxNeighborCount);
+    process<<<grid, block>>>(src, dst, src.rows, src.cols, neighborSize, sigma, factor, d_neighborBuffer, maxNeighborCount, floatSize);
 
+    cudaError_t err; 
     err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         std::cerr << "CUDA device sync failed: " << cudaGetErrorString(err) << std::endl;
     }
 
-    err = cudaFree(d_neighborBuffer);
+    cudaFree(d_neighborBuffer);
     if (err != cudaSuccess) {
         std::cerr << "cudaFree failed: " << cudaGetErrorString(err) << std::endl;
     }

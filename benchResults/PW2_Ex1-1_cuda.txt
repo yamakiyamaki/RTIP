@@ -1,0 +1,218 @@
+=== Benchmark Results ===
+===================================================
+Block lines: 1 
+===================================================
+Block cols: 1
+Time for 1 iteration: 1.08807e-05 s
+IPS: 91906
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.22806e-05 s
+IPS: 81429.5
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 1.2328e-05 s
+IPS: 81115.9
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.0966e-05 s
+IPS: 91190.8
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 1.07433e-05 s
+IPS: 93081.4
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.0812e-05 s
+IPS: 92489.8
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 1.13702e-05 s
+IPS: 87949
+-------------------------------
+===================================================
+Block lines: 6 
+===================================================
+Block cols: 1
+Time for 1 iteration: 1.1482e-05 s
+IPS: 87093.1
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.12168e-05 s
+IPS: 89152.1
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 1.12352e-05 s
+IPS: 89005.8
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.66217e-05 s
+IPS: 60162.5
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 1.11096e-05 s
+IPS: 90011.9
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.21976e-05 s
+IPS: 81983.1
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 1.17225e-05 s
+IPS: 85305.7
+-------------------------------
+===================================================
+Block lines: 11 
+===================================================
+Block cols: 1
+Time for 1 iteration: 2.06715e-05 s
+IPS: 48375.7
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.092e-05 s
+IPS: 91575.4
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 2.09045e-05 s
+IPS: 47836.6
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.28075e-05 s
+IPS: 78079
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 1.25568e-05 s
+IPS: 79638.3
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.13173e-05 s
+IPS: 88360
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 1.20638e-05 s
+IPS: 82892.5
+-------------------------------
+===================================================
+Block lines: 16 
+===================================================
+Block cols: 1
+Time for 1 iteration: 1.12448e-05 s
+IPS: 88929.8
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.76825e-05 s
+IPS: 56553.2
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 1.80077e-05 s
+IPS: 55531.7
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.13322e-05 s
+IPS: 88244.4
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 1.28378e-05 s
+IPS: 77894.8
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.66369e-05 s
+IPS: 60107.4
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 1.13724e-05 s
+IPS: 87932
+-------------------------------
+===================================================
+Block lines: 21 
+===================================================
+Block cols: 1
+Time for 1 iteration: 2.1163e-05 s
+IPS: 47252.2
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.11996e-05 s
+IPS: 89289.1
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 1.30417e-05 s
+IPS: 76676.9
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.13872e-05 s
+IPS: 87817.6
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 2.05652e-05 s
+IPS: 48625.9
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.09975e-05 s
+IPS: 90930.1
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 2.0738e-05 s
+IPS: 48220.6
+-------------------------------
+===================================================
+Block lines: 26 
+===================================================
+Block cols: 1
+Time for 1 iteration: 1.0975e-05 s
+IPS: 91116
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 2.13814e-05 s
+IPS: 46769.6
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 1.09376e-05 s
+IPS: 91427.9
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.07607e-05 s
+IPS: 92930.6
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 2.07334e-05 s
+IPS: 48231.3
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.15649e-05 s
+IPS: 86468.7
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 2.10525e-05 s
+IPS: 47500.3
+-------------------------------
+===================================================
+Block lines: 31 
+===================================================
+Block cols: 1
+Time for 1 iteration: 2.12604e-05 s
+IPS: 47035.8
+-------------------------------
+Block cols: 6
+Time for 1 iteration: 1.13468e-05 s
+IPS: 88130.7
+-------------------------------
+Block cols: 11
+Time for 1 iteration: 2.06946e-05 s
+IPS: 48321.9
+-------------------------------
+Block cols: 16
+Time for 1 iteration: 1.11284e-05 s
+IPS: 89859.9
+-------------------------------
+Block cols: 21
+Time for 1 iteration: 2.10866e-05 s
+IPS: 47423.6
+-------------------------------
+Block cols: 26
+Time for 1 iteration: 1.31509e-05 s
+IPS: 76040.7
+-------------------------------
+Block cols: 31
+Time for 1 iteration: 1.12733e-05 s
+IPS: 88705.3
+-------------------------------

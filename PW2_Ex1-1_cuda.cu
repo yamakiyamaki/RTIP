@@ -118,9 +118,10 @@ int divUp(int a, int b) // Ensures CUDA grid dimensions are big enough.
     return ((a % b) != 0) ? (a / b + 1) : (a / b);
 }
 
-void startCUDA(cv::cuda::GpuMat &src, cv::cuda::GpuMat &dst, int modeN)
+void startCUDA(cv::cuda::GpuMat &src, cv::cuda::GpuMat &dst, int modeN, int blockLines, int blockCols)
 {
-    const dim3 block(32, 8);
+    // const dim3 block(32,8);
+    const dim3 block(blockLines,blockCols);
     const dim3 grid(divUp(src.cols, block.x), divUp(src.rows, block.y));
 
     process<<<grid, block>>>(src, dst, src.rows, src.cols, modeN);

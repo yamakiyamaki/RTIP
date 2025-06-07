@@ -12,7 +12,7 @@
 using namespace std;
 using namespace cv;
 
-void startCUDA ( cv::cuda::GpuMat& src,cv::cuda::GpuMat& dst, int modeN );
+void startCUDA ( cv::cuda::GpuMat& src,cv::cuda::GpuMat& dst, int modeN, int blockLines, int blockCols);
 
 
 int main( int argc, char** argv )
@@ -40,20 +40,28 @@ int main( int argc, char** argv )
   else if (mode == "halfColor") { modeN = 3; }
   else if (mode == "optimized") { modeN = 4; }
 
+  int blockLines;
+  int blockCols;
   int iter = atoi(argv[3]);
+  if (argc > 5) {
+    blockLines = atoi(argv[5]);
+    blockCols = atoi(argv[6]);
+  } else {
+    blockLines = 32;
+    blockCols = 8;
+  }
+  
   for (int i=0;i<iter;i++)
   {
-    startCUDA(d_imaRGB, d_result, modeN );
+    startCUDA(d_imaRGB, d_result, modeN, blockLines, blockCols);
   }
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> diff = end-begin;
   
-  cout << "Total time: " << diff.count() << " s" << endl;
+  // cout << "Total time: " << diff.count() << " s" << endl;
   cout << "Time for 1 iteration: " << diff.count()/iter << " s" << endl;
   cout << "IPS: " << iter/diff.count() << endl;
   
-  cout << d_imaRGB.cols << endl;
-
   d_result.download(h_result);
   
   for (int i=0;i<h_result.rows;i++)
